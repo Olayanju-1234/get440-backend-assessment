@@ -1,5 +1,11 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNumber, IsString, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  validateSync,
+} from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -17,11 +23,13 @@ class EnvironmentVariables {
   @IsString()
   MONGODB_URI: string = '';
 
+  @IsOptional()
   @IsString()
-  PAYSTACK_SECRET_KEY: string = '';
+  PAYSTACK_SECRET_KEY?: string;
 
+  @IsOptional()
   @IsString()
-  PAYSTACK_PUBLIC_KEY: string = '';
+  PAYSTACK_PUBLIC_KEY?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

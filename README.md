@@ -31,9 +31,13 @@ Create a `.env` file in the root directory:
 ```env
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017/ecommerce
+
+# Optional - Required only for payment processing
 PAYSTACK_SECRET_KEY=sk_test_your_secret_key
 PAYSTACK_PUBLIC_KEY=pk_test_your_public_key
 ```
+
+> **Note**: The application will start without Paystack keys. Payment-related endpoints will return an error prompting you to configure the keys.
 
 ### Running the Application
 

@@ -47,6 +47,12 @@ export class OrderService {
       throw new EmptyCartException();
     }
 
+    if (!this.paystackSecretKey) {
+      throw new PaymentVerificationException(
+        'Paystack secret key is not configured. Please set PAYSTACK_SECRET_KEY in your environment variables.',
+      );
+    }
+
     for (const item of cartItems) {
       if (item.quantity > item.product.stock) {
         throw new InsufficientStockException(
