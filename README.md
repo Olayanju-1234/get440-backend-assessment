@@ -7,7 +7,6 @@ A simple e-commerce backend service built with NestJS and MongoDB, demonstrating
 - **Framework**: NestJS
 - **Database**: MongoDB with Mongoose
 - **Validation**: class-validator, class-transformer
-- **Payment**: Paystack
 - **Documentation**: Swagger/OpenAPI
 
 ## Getting Started
@@ -16,7 +15,6 @@ A simple e-commerce backend service built with NestJS and MongoDB, demonstrating
 
 - Node.js (v18+)
 - MongoDB (local or Atlas)
-- Paystack account (for payment processing)
 
 ### Installation
 
@@ -31,13 +29,7 @@ Create a `.env` file in the root directory:
 ```env
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017/ecommerce
-
-# Optional - Required only for payment processing
-PAYSTACK_SECRET_KEY=sk_test_your_secret_key
-PAYSTACK_PUBLIC_KEY=pk_test_your_public_key
 ```
-
-> **Note**: The application will start without Paystack keys. Payment-related endpoints will return an error prompting you to configure the keys.
 
 ### Running the Application
 
@@ -86,8 +78,7 @@ All order endpoints require the `x-user-id` header.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/v1/orders/checkout` | Initialize checkout (returns payment URL) |
-| GET | `/v1/orders/verify/:reference` | Verify payment and complete order |
+| POST | `/v1/orders/checkout` | Process checkout (creates order, reduces stock, clears cart) |
 | GET | `/v1/orders` | Get order history |
 
 ## Business Rules
@@ -112,7 +103,7 @@ src/
 └── main.ts
 ```
 
-## Sample Request
+## Sample Requests
 
 ### Add to Cart
 
@@ -127,7 +118,5 @@ curl -X POST http://localhost:3000/v1/cart \
 
 ```bash
 curl -X POST http://localhost:3000/v1/orders/checkout \
-  -H "Content-Type: application/json" \
-  -H "x-user-id: user123" \
-  -d '{"email": "customer@example.com"}'
+  -H "x-user-id: user123"
 ```

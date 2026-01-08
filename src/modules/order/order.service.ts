@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
-import { Connection, Model } from 'mongoose';
+import { Model } from 'mongoose';
 import axios from 'axios';
 import { Order, OrderDocument, OrderStatus } from './schemas/order.schema';
 import { CheckoutDto } from './dto';
@@ -26,7 +26,6 @@ export class OrderService {
 
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-    @InjectConnection() private connection: Connection,
     private cartService: CartService,
     private productService: ProductService,
     private configService: ConfigService,
@@ -37,20 +36,69 @@ export class OrderService {
     );
   }
 
-  async initiateCheckout(
-    userId: string,
-    checkoutDto: CheckoutDto,
-  ): Promise<CheckoutResponse> {
+  async checkout(userId: string): Promise<OrderDocument> {
     const cartItems = await this.cartService.getCartItemsForCheckout(userId);
 
     if (cartItems.length === 0) {
       throw new EmptyCartException();
     }
 
+    for (const item of cartItems) {
+      if (item.quantity > item.product.stock) {
+        throw new InsufficientStockException(
+          item.product.name,
+          item.product.stock,
+        );
+      }
+    }
+
+    const orderItems = cartItems.map((item) => ({
+      productId: item.productId,
+      productName: item.product.name,
+      productPrice: item.product.price,
+      quantity: item.quantity,
+    }));
+
+    const totalAmount = cartItems.reduce(
+      (sum, item) => sum + item.product.price * item.quantity,
+      0,
+    );
+
+    const reference = `order_${Date.now()}_${userId.slice(-6)}`;
+
+    const order = new this.orderModel({
+      userId,
+      items: orderItems,
+      totalAmount,
+      status: OrderStatus.COMPLETED,
+      paymentReference: reference,
+    });
+
+    await order.save();
+
+    for (const item of cartItems) {
+      await this.productService.reduceStock(item.productId, item.quantity);
+    }
+
+    await this.cartService.clearCart(userId);
+
+    return order;
+  }
+
+  async initiatePaystackCheckout(
+    userId: string,
+    checkoutDto: CheckoutDto,
+  ): Promise<CheckoutResponse> {
     if (!this.paystackSecretKey) {
       throw new PaymentVerificationException(
         'Paystack secret key is not configured. Please set PAYSTACK_SECRET_KEY in your environment variables.',
       );
+    }
+
+    const cartItems = await this.cartService.getCartItemsForCheckout(userId);
+
+    if (cartItems.length === 0) {
+      throw new EmptyCartException();
     }
 
     for (const item of cartItems) {
@@ -99,6 +147,12 @@ export class OrderService {
     userId: string,
     reference: string,
   ): Promise<OrderDocument> {
+    if (!this.paystackSecretKey) {
+      throw new PaymentVerificationException(
+        'Paystack secret key is not configured.',
+      );
+    }
+
     const existingOrder = await this.orderModel.findOne({
       paymentReference: reference,
     });
@@ -125,66 +179,50 @@ export class OrderService {
       );
     }
 
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    const cartItems = await this.cartService.getCartItemsForCheckout(userId);
 
-    try {
-      const cartItems = await this.cartService.getCartItemsForCheckout(userId);
+    if (cartItems.length === 0) {
+      throw new EmptyCartException();
+    }
 
-      if (cartItems.length === 0) {
-        throw new EmptyCartException();
-      }
-
-      for (const item of cartItems) {
-        if (item.quantity > item.product.stock) {
-          throw new InsufficientStockException(
-            item.product.name,
-            item.product.stock,
-          );
-        }
-      }
-
-      const orderItems = cartItems.map((item) => ({
-        productId: item.productId,
-        productName: item.product.name,
-        productPrice: item.product.price,
-        quantity: item.quantity,
-      }));
-
-      const totalAmount = cartItems.reduce(
-        (sum, item) => sum + item.product.price * item.quantity,
-        0,
-      );
-
-      const order = new this.orderModel({
-        userId,
-        items: orderItems,
-        totalAmount,
-        status: OrderStatus.COMPLETED,
-        paymentReference: reference,
-      });
-
-      await order.save({ session });
-
-      for (const item of cartItems) {
-        await this.productService.reduceStock(
-          item.productId,
-          item.quantity,
-          session,
+    for (const item of cartItems) {
+      if (item.quantity > item.product.stock) {
+        throw new InsufficientStockException(
+          item.product.name,
+          item.product.stock,
         );
       }
-
-      await this.cartService.clearCart(userId, session);
-
-      await session.commitTransaction();
-
-      return order;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      void session.endSession();
     }
+
+    const orderItems = cartItems.map((item) => ({
+      productId: item.productId,
+      productName: item.product.name,
+      productPrice: item.product.price,
+      quantity: item.quantity,
+    }));
+
+    const totalAmount = cartItems.reduce(
+      (sum, item) => sum + item.product.price * item.quantity,
+      0,
+    );
+
+    const order = new this.orderModel({
+      userId,
+      items: orderItems,
+      totalAmount,
+      status: OrderStatus.COMPLETED,
+      paymentReference: reference,
+    });
+
+    await order.save();
+
+    for (const item of cartItems) {
+      await this.productService.reduceStock(item.productId, item.quantity);
+    }
+
+    await this.cartService.clearCart(userId);
+
+    return order;
   }
 
   async getOrders(userId: string): Promise<OrderDocument[]> {

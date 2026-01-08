@@ -16,21 +16,35 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @Post('checkout')
-  @ApiOperation({ summary: 'Initialize checkout and get payment URL' })
+  @ApiOperation({ summary: 'Process checkout and create order' })
   @ApiResponse({
     status: 201,
-    description: 'Checkout initiated, payment URL returned',
+    description: 'Order created, stock reduced, cart cleared',
   })
   @ApiResponse({ status: 400, description: 'Empty cart or insufficient stock' })
-  async checkout(
+  async checkout(@Headers('x-user-id') userId: string): Promise<OrderDocument> {
+    return this.orderService.checkout(userId);
+  }
+
+  @Post('checkout/paystack')
+  @ApiOperation({ summary: 'Initialize Paystack payment (optional)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Payment URL returned',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Empty cart, insufficient stock, or Paystack not configured',
+  })
+  async paystackCheckout(
     @Headers('x-user-id') userId: string,
     @Body() checkoutDto: CheckoutDto,
   ): Promise<CheckoutResponse> {
-    return this.orderService.initiateCheckout(userId, checkoutDto);
+    return this.orderService.initiatePaystackCheckout(userId, checkoutDto);
   }
 
   @Get('verify/:reference')
-  @ApiOperation({ summary: 'Verify payment and complete order' })
+  @ApiOperation({ summary: 'Verify Paystack payment and complete order' })
   @ApiResponse({ status: 200, description: 'Order completed successfully' })
   @ApiResponse({ status: 400, description: 'Payment verification failed' })
   async verifyPayment(
