@@ -1,59 +1,75 @@
 # E-Commerce Backend API
 
-A simple e-commerce backend service built with NestJS and MongoDB, demonstrating clean architecture, proper business logic implementation, and best practices.
+A backend service for e-commerce operations built with NestJS and MongoDB.
+
+---
+
+## Table of Contents
+
+- [Tech Stack](#tech-stack)
+- [Models](#models)
+- [API Endpoints](#api-endpoints)
+- [Business Rules](#business-rules)
+- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [API Usage Examples](#api-usage-examples)
+
+---
 
 ## Tech Stack
 
-- **Framework**: NestJS
-- **Database**: MongoDB with Mongoose
-- **Validation**: class-validator, class-transformer
-- **Documentation**: Swagger/OpenAPI
+| Component | Technology |
+|-----------|------------|
+| Framework | NestJS |
+| Database | MongoDB with Mongoose |
+| Language | TypeScript |
+| Validation | class-validator, class-transformer |
+| Documentation | Swagger/OpenAPI |
 
-## Getting Started
+---
 
-### Prerequisites
+## Models
 
-- Node.js (v18+)
-- MongoDB (local or Atlas)
+The application implements four data models:
 
-### Installation
+### Product
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | Product name |
+| description | string | Product description |
+| price | number | Price in kobo |
+| stock | number | Available quantity |
+| imageUrl | string | Product image URL (optional) |
 
-```bash
-npm install
-```
+### Cart Item
+| Field | Type | Description |
+|-------|------|-------------|
+| userId | string | User identifier |
+| productId | ObjectId | Reference to Product |
+| quantity | number | Quantity in cart |
 
-### Environment Variables
+### Order
+| Field | Type | Description |
+|-------|------|-------------|
+| userId | string | User identifier |
+| items | OrderItem[] | Array of order items |
+| totalAmount | number | Total price in kobo |
+| status | enum | pending, completed, cancelled |
+| paymentReference | string | Unique order reference |
 
-Create a `.env` file in the root directory:
+### Order Item
+| Field | Type | Description |
+|-------|------|-------------|
+| productId | ObjectId | Reference to Product |
+| productName | string | Product name at time of purchase |
+| productPrice | number | Price at time of purchase |
+| quantity | number | Quantity ordered |
 
-```env
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/ecommerce
-```
-
-### Running the Application
-
-```bash
-# Development
-npm run start:dev
-
-# Production
-npm run build
-npm run start:prod
-```
-
-The server starts at `http://localhost:3000`.
-
-## API Documentation
-
-Interactive API documentation is available at:
-```
-http://localhost:3000/api/docs
-```
+---
 
 ## API Endpoints
 
-All endpoints are prefixed with `/v1`.
+All endpoints are prefixed with `/v1`. Cart and Order endpoints require the `x-user-id` header.
 
 ### Products
 
@@ -63,49 +79,129 @@ All endpoints are prefixed with `/v1`.
 
 ### Cart
 
-All cart endpoints require the `x-user-id` header.
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/v1/cart` | Get cart items |
+| GET | `/v1/cart` | Get cart items for user |
 | POST | `/v1/cart` | Add item to cart |
-| PATCH | `/v1/cart/:productId` | Update item quantity |
+| PATCH | `/v1/cart/:productId` | Update cart item quantity |
 | DELETE | `/v1/cart/:productId` | Remove item from cart |
 
 ### Orders
 
-All order endpoints require the `x-user-id` header.
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/v1/orders/checkout` | Process checkout (creates order, reduces stock, clears cart) |
-| GET | `/v1/orders` | Get order history |
+| POST | `/v1/orders/checkout` | Process checkout |
+| GET | `/v1/orders` | Get user's order history |
+
+---
 
 ## Business Rules
 
-1. **Stock Validation**: Users cannot add more items than available stock
-2. **Stock Reduction**: Product stock is reduced upon successful checkout
-3. **Cart Clearing**: Cart is automatically cleared after successful checkout
+1. **Stock Validation**: Users cannot add more items to cart than available stock. The system validates stock on both add and update operations.
+
+2. **Stock Reduction**: When checkout is processed, product stock is reduced by the ordered quantity.
+
+3. **Cart Clearing**: After successful checkout, the user's cart is automatically cleared.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js v18 or higher
+- MongoDB (local installation or MongoDB Atlas)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone git@github.com:Olayanju-1234/get440-backend-assessment.git
+cd get440-backend-assessment
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Create environment file:
+```bash
+cp .env.example .env
+```
+
+4. Configure environment variables in `.env`:
+```env
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/ecommerce
+```
+
+### Running the Application
+
+Development mode:
+```bash
+npm run start:dev
+```
+
+Production mode:
+```bash
+npm run build
+npm run start:prod
+```
+
+The server starts at `http://localhost:3000`.
+
+### API Documentation
+
+Interactive Swagger documentation is available at:
+```
+http://localhost:3000/api/docs
+```
+
+---
 
 ## Project Structure
 
 ```
 src/
 ├── common/
-│   ├── exceptions/     # Custom exception classes
-│   └── filters/        # Global exception filter
-├── config/             # Configuration
+│   ├── exceptions/          # Custom exception classes
+│   └── filters/             # Global exception filter
+├── config/                  # Environment configuration
 ├── modules/
-│   ├── product/        # Product module
-│   ├── cart/           # Cart module
-│   └── order/          # Order module
+│   ├── product/
+│   │   ├── dto/             # Data transfer objects
+│   │   ├── schemas/         # Mongoose schemas
+│   │   ├── product.controller.ts
+│   │   ├── product.service.ts
+│   │   └── product.module.ts
+│   ├── cart/
+│   │   ├── dto/
+│   │   ├── schemas/
+│   │   ├── cart.controller.ts
+│   │   ├── cart.service.ts
+│   │   └── cart.module.ts
+│   └── order/
+│       ├── dto/
+│       ├── schemas/
+│       ├── order.controller.ts
+│       ├── order.service.ts
+│       └── order.module.ts
 ├── app.module.ts
 └── main.ts
 ```
 
-## Sample Requests
+---
 
-### Add to Cart
+## API Usage Examples
+
+### Get All Products
+
+```bash
+curl http://localhost:3000/v1/products
+```
+
+### Add Item to Cart
 
 ```bash
 curl -X POST http://localhost:3000/v1/cart \
@@ -114,9 +210,60 @@ curl -X POST http://localhost:3000/v1/cart \
   -d '{"productId": "PRODUCT_ID", "quantity": 2}'
 ```
 
+### Update Cart Item Quantity
+
+```bash
+curl -X PATCH http://localhost:3000/v1/cart/PRODUCT_ID \
+  -H "Content-Type: application/json" \
+  -H "x-user-id: user123" \
+  -d '{"quantity": 3}'
+```
+
+### Remove Item from Cart
+
+```bash
+curl -X DELETE http://localhost:3000/v1/cart/PRODUCT_ID \
+  -H "x-user-id: user123"
+```
+
 ### Checkout
 
 ```bash
 curl -X POST http://localhost:3000/v1/orders/checkout \
   -H "x-user-id: user123"
 ```
+
+### Get Orders
+
+```bash
+curl http://localhost:3000/v1/orders \
+  -H "x-user-id: user123"
+```
+
+---
+
+## Bonus Features
+
+The following additional features are available:
+
+### Payment Integration (Paystack)
+
+If Paystack credentials are configured, payment processing is available:
+
+```env
+PAYSTACK_SECRET_KEY=sk_test_xxxxx
+PAYSTACK_PUBLIC_KEY=pk_test_xxxxx
+```
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/v1/orders/checkout/paystack` | Initialize Paystack payment |
+| GET | `/v1/orders/verify/:reference` | Verify payment and complete order |
+
+### Product Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/v1/products/:id` | Get product by ID |
+| POST | `/v1/products` | Create new product |
+| PATCH | `/v1/products/:id` | Update product |
