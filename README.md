@@ -7,12 +7,88 @@ A backend service for e-commerce operations built with NestJS and MongoDB.
 ## Table of Contents
 
 - [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
 - [Models](#models)
 - [API Endpoints](#api-endpoints)
 - [Business Rules](#business-rules)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [API Usage Examples](#api-usage-examples)
+
+---
+
+---
+
+## Architecture
+
+### System Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Client                                   │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     NestJS Application                           │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Product   │  │    Cart     │  │    Order    │              │
+│  │   Module    │  │   Module    │  │   Module    │              │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
+│         │                │                │                      │
+│         └────────────────┼────────────────┘                      │
+│                          │                                       │
+│                          ▼                                       │
+│              ┌───────────────────────┐                          │
+│              │    Mongoose ODM       │                          │
+│              └───────────┬───────────┘                          │
+└──────────────────────────┼──────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        MongoDB                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  products   │  │  cartitems  │  │   orders    │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Design Decisions
+
+**1. Modular Architecture**
+
+The application follows NestJS modular architecture with clear separation of concerns:
+- Each feature (Product, Cart, Order) is encapsulated in its own module
+- Modules contain their own controllers, services, DTOs, and schemas
+- Dependencies between modules are explicitly declared
+
+**2. Data Model Design**
+
+- **Product**: Standalone document with stock tracking
+- **CartItem**: Separate collection with compound index on (userId, productId) for uniqueness
+- **Order**: Contains embedded OrderItem array for atomic order data
+- **OrderItem**: Embedded within Order (not a separate collection) to ensure order history integrity
+
+**3. Embedded vs Referenced Documents**
+
+OrderItem is embedded within Order rather than referenced because:
+- Order items do not exist independently of orders
+- Embedding ensures order history is immutable (price at time of purchase is preserved)
+- Reduces database queries when fetching order details
+
+**4. Stock Validation Strategy**
+
+Stock is validated at two points:
+- When adding/updating cart items (prevents adding more than available)
+- At checkout (double-check before order creation)
+
+**5. Cart Aggregation**
+
+Cart retrieval uses MongoDB aggregation pipeline with `$lookup` to fetch product details in a single query, avoiding N+1 query issues.
+
+**6. API Versioning**
+
+All endpoints are versioned (`/v1/`) to support future API evolution without breaking existing clients.
 
 ---
 
